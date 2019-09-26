@@ -60,4 +60,83 @@ internal class PhysicalOrderTest {
         assertThat(ex.message).isEqualTo("A Physical Order may only contain Physical items")
     }
 
+    @Test
+    fun `when placing a PhysicalOrder, there must be at least one item in the list`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            val physicalOrder = PhysicalOrder(listOf(), account)
+            physicalOrder.place()
+        }
+        assertThat(ex.message).isEqualTo("There must be at least one item to place the Order")
+    }
+
+    @Test
+    fun `when placing a Physical Order, a shippingAddress must be informed`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            val physicalOrder = PhysicalOrder(physicalItems, account)
+                    .withPaymentMethod(paymentMethod)
+            physicalOrder.place()
+        }
+        assertThat(ex.message).isEqualTo("Shipping Address must be informed for Orders with physical delivery")
+    }
+
+    @Test
+    fun `when placing a PhysicalOrder, a paymentMethod must be informed`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            val physicalOrder = PhysicalOrder(physicalItems, account)
+            physicalOrder.withShippingAddress(shippingAddress)
+            physicalOrder.place()
+        }
+        assertThat(ex.message).isEqualTo("A Payment method must be informed to place the Order")
+    }
+
+
+    @Test
+    fun `when placing a Physical Order with Physical and Physical_Books, there should be different parcels`() {
+        val physicalItems = listOf(physicalItems, physicalTaxFreeItems).flatten()
+        val physicalOrder = PhysicalOrder(physicalItems, account)
+                .withShippingAddress(shippingAddress)
+                .withPaymentMethod(paymentMethod)
+                .place()
+
+        val parcels = physicalOrder.parcels()
+        assertThat(parcels.size).isEqualTo(2)
+    }
+
+    @Test
+    fun `when placing a Physical Order with physical_books, its package must contain notes informing it's free of taxes`() {
+        val physicalItems = listOf(physicalItems, physicalTaxFreeItems).flatten()
+        val physicalOrder = PhysicalOrder(physicalItems, account)
+                .withShippingAddress(shippingAddress)
+                .withPaymentMethod(paymentMethod)
+                .place()
+
+        val parcel = physicalOrder.parcels()
+                .asSequence()
+                .find { it.shippingLabel == ShippingLabel.TAX_FREE }
+
+        assertThat(parcel!!.shippingLabel.description)
+                .isEqualTo("Isento de impostos conforme disposto na Constituição Art. 150, VI, d.")
+    }
+
+    @Test
+    fun `when placing a Physical Order, subtotal should compute overall sum of all Item prices`() {
+        val physicalItems = listOf(physicalItems, physicalTaxFreeItems).flatten()
+        val physicalOrder = PhysicalOrder(physicalItems, account)
+                .withShippingAddress(shippingAddress)
+                .withPaymentMethod(paymentMethod)
+                .place()
+
+        assertThat(physicalOrder.subtotal().toPlainString()).isEqualTo("3256.14")
+    }
+
+    @Test
+    fun `when placing a Physical Order, total should compute subtotal plus shippingCosts`() {
+        val physicalItems = listOf(physicalItems, physicalTaxFreeItems).flatten()
+        val physicalOrder = PhysicalOrder(physicalItems, account)
+                .withShippingAddress(shippingAddress)
+                .withPaymentMethod(paymentMethod)
+                .place()
+
+        assertThat(physicalOrder.grandTotal().toPlainString()).isEqualTo("3276.14")
+    }
 }
